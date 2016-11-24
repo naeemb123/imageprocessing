@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #pragma pack(push, 1)
 typedef struct tagBITMAPFILEHEADER
@@ -30,107 +31,213 @@ typedef struct tagBITMAPINFOHEADER
 }BITMAPINFOHEADER;
 #pragma pack(pop)
 
-unsigned char *LoadBitmapFile(char *filename, BITMAPINFOHEADER *bitmapInfoHeader, BITMAPFILEHEADER *bitmapFileHeader)
+typedef struct tagPIXELS
 {
-    FILE *filePtr; //our file pointer
-    // BITMAPFILEHEADER bitmapFileHeader; //our bitmap file header
-    unsigned char *bitmapImage;  //store image data
-    int imageIdx=0;  //image index counter
-    unsigned char tempRGB;  //our swap variable
-
-    //open filename in read binary mode
-    filePtr = fopen(filename,"rb");
-    if (filePtr == NULL)
-        return NULL;
-    //read the bitmap file header
-    fread(bitmapFileHeader, sizeof(BITMAPFILEHEADER),1,filePtr);
+  float *red;
+  float *green;
+  float *blue;
+}PIXELCOLORS;
 
 
 
-    //verify that this is a bmp file by check bitmap id
-    if (bitmapFileHeader->bfType !=0x4D42)
-    {
-        fclose(filePtr);
-        return NULL;
-    }
-
-    //read the bitmap info header
-    fread(bitmapInfoHeader, sizeof(BITMAPINFOHEADER),1,filePtr); // small edit. forgot to add the closing bracket at sizeof
-
-    //move file point to the begging of bitmap data
-    fseek(filePtr, bitmapFileHeader->bOffBits, SEEK_SET);
+/*
+>>FUCTION<<
+Read BMP file and return a struct which contains all three colour planes of each
+pixel in the image
+*/
+PIXELCOLORS *readBmp(char *filename, BITMAPINFOHEADER *bitmapInfoHeader, BITMAPFILEHEADER *bitmapFileHeader){
 
 
-    //Testing to see if the data has been read correctly
-    printf("size of image in bytes:\t%d\n", bitmapInfoHeader->biSizeImage);
-    printf("width of image:\t%d\n", bitmapInfoHeader->biWidth);
-    printf("height of image:\t%d\n", bitmapInfoHeader->biHeight);
-    printf("Number of colour planes:\t%d\n", bitmapInfoHeader->biPlanes);
-    printf("Number of bits per pixel:\t%d\n", bitmapInfoHeader->biBitCount);
+  /*==============================================================================
+               OPEN BMP FILE AND READ IN THE DATA INTO THE STRUCTS
+  ================================================================================*/
+  FILE *filePtr; //our file pointer
+  unsigned char *bitmapImage;  //store image data
+  int imageIdx=0;  //image index counter
+  unsigned char tempRGB;  //our swap variable
+  PIXELCOLORS *colorPlanes = (PIXELCOLORS *)malloc(sizeof(PIXELCOLORS));
 
-      //allocate enough memory for the bitmap image data
-    bitmapImage = (unsigned char*)malloc(bitmapInfoHeader->biSizeImage);
+  //open filename in read binary mode
+  filePtr = fopen(filename,"rb");
+  if (filePtr == NULL)
+      return NULL;
+  //read the bitmap file header
+  fread(bitmapFileHeader, sizeof(BITMAPFILEHEADER),1,filePtr);
 
-    //verify memory allocation
-    if (!bitmapImage)
-    {
-        free(bitmapImage);
-        fclose(filePtr);
-        return NULL;
-    }
 
-    //read in the bitmap image data
-    fread(bitmapImage,bitmapInfoHeader->biSizeImage,1,filePtr);
+  //verify that this is a bmp file by check bitmap id
+  if (bitmapFileHeader->bfType !=0x4D42){
+      fclose(filePtr);
+      return NULL;
+  }
 
-    //make sure bitmap image data was read
-    if (bitmapImage == NULL)
-    {
-        fclose(filePtr);
-        return NULL;
-    }
+  //read the bitmap info header
+  fread(bitmapInfoHeader, sizeof(BITMAPINFOHEADER),1,filePtr);
+
+  //move file point to the begging of bitmap data
+  fseek(filePtr, bitmapFileHeader->bOffBits, SEEK_SET);
+  /*==============================================================================*/
 
 
 
+  /*==============================================================================
+                            READ BITMAP IMAGE DATA
+  ================================================================================*/
+  //allocate memory for the bitmap image data
+  bitmapImage = (unsigned char*)malloc(bitmapInfoHeader->biSizeImage);
 
-    //swap the r and b values to get RGB (bitmap is BGR)
-    // for (imageIdx = 0; imageIdx < bitmapInfoHeader->biSizeImage;imageIdx+=3)
-    // {
-    //
-    //     tempRGB = bitmapImage[imageIdx];
-    //     bitmapImage[imageIdx] = bitmapImage[imageIdx + 2];
-    //     bitmapImage[imageIdx + 2] = tempRGB;
-    //     // printf("%d %d %d\n",bitmapImage[imageIdx],bitmapImage[imageIdx+1],bitmapImage[imageIdx+2]);
-    // }
+  //verify memory allocation
+  if (!bitmapImage)
+  {
+      free(bitmapImage);
+      fclose(filePtr);
+      return NULL;
+  }
+
+  //read in the bitmap image data
+  fread(bitmapImage,bitmapInfoHeader->biSizeImage,1,filePtr);
+
+  //make sure bitmap image data was read
+  if (bitmapImage == NULL)
+  {
+      fclose(filePtr);
+      return NULL;
+  }
+  /*==============================================================================*/
 
 
 
-    //width of image in pixels(24bits) is = bitmapInfoHeader->biWidth*3
-    // for (imageIdx=0; imageIdx < (bitmapInfoHeader->biWidth*3)*(bitmapInfoHeader->biHeight);imageIdx+=3){
-    //     bitmapImage[imageIdx] = 255;
-    //     bitmapImage[imageIdx+1] = 255;
-    //     bitmapImage[imageIdx+2] = 255;
-    // }
-    //
-    // // for (int i=0; i<(bitmapInfoHeader->biWidth*3)*(bitmapInfoHeader->biHeight*3); i+=3){
-    //   bitmapImage[i] = 255;
-    //   bitmapImage[i+1] = 255;
-    //   bitmapImage[i+2] = 255;
-    // }
 
-    // for (int i =0; i< bitmapInfoHeader->biSizeImage; i++){
-    //   printf("%d ",bitmapImage[i]);
-    // }
-    // printf("\n");
+  /*==============================================================================
+          CONVERT EACH PIXELS COLOUR TO FLOAT AND STORE IN THE COLOUR PLANE
+  ================================================================================*/
+  /*==============================
+          VARIABLES NEEDED
+  ================================*/
+  int counter=0;
+  float two, twofivefive,pixel,one,f;
 
-    //close file and return bitmap iamge data
+  //allocate memory to red colour plane
+  colorPlanes->red = (float *)malloc((sizeof(float) * (bitmapInfoHeader->biSizeImage)/3)+1);
+  if (!colorPlanes->red){
+    free(colorPlanes->red);
+    fclose(filePtr);
+  }
+  //allocate memory to blue colour plane
+  colorPlanes->blue = (float *)malloc((sizeof(float) * (bitmapInfoHeader->biSizeImage)/3)+1);
+  if (!colorPlanes->blue){
+    free(colorPlanes->blue);
+    fclose(filePtr);
+  }
+  //allocate memory to green colour plane
+  colorPlanes->green = (float *)malloc((sizeof(float) * (bitmapInfoHeader->biSizeImage)/3)+1);
+  if (!colorPlanes->green){
+    free(colorPlanes->green);
+    fclose(filePtr);
+  }
+  /*===============================*/
+
+
+  //convert and store each pixel colour
+  for (imageIdx=0; imageIdx<bitmapInfoHeader->biSizeImage; imageIdx+=3){
+
+    two = 2;
+    twofivefive = 255;
+    pixel = bitmapImage[imageIdx];
+    one = 1;
+
+    //convert pixel colour to float
+    f = (two/twofivefive)*pixel - one;
+
+    //store blue float colour
+    colorPlanes->blue[counter] = f;
+    pixel = bitmapImage[imageIdx+1];
+
+    //store green float colour
+    f = (two/twofivefive)*pixel - one;
+    colorPlanes->green[counter] = f;
+    pixel = bitmapImage[imageIdx+2];
+
+    //store red float colour
+    f = (two/twofivefive)*pixel - one;
+    colorPlanes->red[counter] = f;
+    counter++;
+  }
+  /*==============================================================================*/
 
     fclose(filePtr);
-    return bitmapImage;
+    return colorPlanes;
 }
 
-void WriteBitmapFile(char *filename, BITMAPINFOHEADER *bitmapInfoHeader, BITMAPFILEHEADER *bitmapFileHeader, unsigned char *bitmapData){
 
+
+/*
+>>FUCTION<<
+convert the manipulated pixels of the image back into integers and store the
+new pixels into a list containing the image data.
+Write this new image data back out to file
+*/
+void writeBmp(PIXELCOLORS *colorPlanes, char *filename, BITMAPINFOHEADER *bitmapInfoHeader, BITMAPFILEHEADER *bitmapFileHeader){
+
+/*==============================================================================
+CONVERT EACH FLOAT FROM EACH COLOUR PLANE BACK TO INTEGER AND STORE AS NEW IMAGE DATA
+================================================================================*/
+
+
+/*==============================
+        VARIABLES NEEDED
+================================*/
+//Allocate memory to list which will contain the image data
+unsigned char *imageData = (unsigned char *)malloc(bitmapInfoHeader->biSizeImage);
+float two,twofivefive,one,fblue,fgreen,fred;
+unsigned char pixelColblue, pixelColgreen, pixelColred;
+int imageIdxCounter=0,imageIdx=0;
+/*===============================*/
+
+
+  for (imageIdx=0; imageIdx<bitmapInfoHeader->biSizeImage; imageIdx+=3){
+    two = 2;
+    twofivefive = 255;
+    one = 1;
+
+    //blue float
+    fblue = colorPlanes->blue[imageIdxCounter];
+    //green float
+    fgreen = colorPlanes->green[imageIdxCounter];
+    //red float
+    fred = colorPlanes->red[imageIdxCounter];
+
+    //blue integer
+    pixelColblue = ((fblue+one))/(two/twofivefive);
+    //green integer
+    pixelColgreen = ((fgreen+one))/(two/twofivefive);
+    //ref integer
+    pixelColred = ((fred+one))/(two/twofivefive);
+
+    //store blue into list
+    imageData[imageIdx] = pixelColblue;
+    //store green into list
+    imageData[imageIdx+1] = pixelColgreen;
+    //store red into list
+    imageData[imageIdx+2] = pixelColred;
+
+    imageIdxCounter++;
+  }
+/*==============================================================================*/
+
+
+
+/*==============================================================================
+                      WRITE NEW IMAGE DATA BACK OUT TO FILE
+================================================================================*/
+
+
+/*==============================
+        VARIABLES NEEDED
+================================*/
   FILE *filePtr;
+/*===============================*/
+
 
   //open filename in write mode
   filePtr = fopen(filename,"w");
@@ -148,163 +255,130 @@ void WriteBitmapFile(char *filename, BITMAPINFOHEADER *bitmapInfoHeader, BITMAPF
   fseek(filePtr,sizeof(char)*bitmapFileHeader->bOffBits,SEEK_SET);
 
   //write imageData
-  fwrite(bitmapData,sizeof(char),bitmapInfoHeader->biSizeImage,filePtr);
+  fwrite(imageData,sizeof(char),bitmapInfoHeader->biSizeImage,filePtr);
+
   fclose(filePtr);
+  free(imageData);
+  free(colorPlanes->blue);
+  free(colorPlanes->green);
+  free(colorPlanes->red);
+  free(colorPlanes);
+  /*==============================================================================*/
 }
 
-unsigned char *applySharpeningFilter(BITMAPINFOHEADER *bitmapInfoHeader, unsigned char *bitmapImage){
-  int x,xx,y,yy,ile,avgR,avgB,avgG,B,G,R,centerR,centerB,centerG;
-  int blurSize = 3;
-
-  for(xx = 0; xx < bitmapInfoHeader->biWidth; xx++)
-{
-  for(yy = 0; yy < bitmapInfoHeader->biHeight; yy++)
-  {
-      avgB = avgG = avgR = 0;
-      ile = 0;
-
-      for(x = xx; x < bitmapInfoHeader->biWidth && x < xx + blurSize; x++)
-      {
 
 
-          for(y = yy; y < bitmapInfoHeader->biHeight && y < yy + blurSize; y++)
-          {
-              if (x == xx && y == yy){
-                centerB = 9*(bitmapImage[x*3 + y*bitmapInfoHeader->biWidth*3 + 0]);
-                centerG = 9*(bitmapImage[x*3 + y*bitmapInfoHeader->biWidth*3 + 1]);
-                centerR = 9*(bitmapImage[x*3 + y*bitmapInfoHeader->biWidth*3 + 2]);
-              }
-              else{
-                avgB +=  -1*(bitmapImage[x*3 + y*bitmapInfoHeader->biWidth*3 + 0]);
-                avgG +=  -1*(bitmapImage[x*3 + y*bitmapInfoHeader->biWidth*3 + 1]);
-                avgR +=  -1*(bitmapImage[x*3 + y*bitmapInfoHeader->biWidth*3 + 2]);
-              }
+/*
+>>FUCTION<<
+for each pixel in the image, apply the kernel
+*/
+PIXELCOLORS *convolue(PIXELCOLORS *colorPlanes, BITMAPINFOHEADER *bitmapInfoHeader, int kernelW, int kernelH, float *kernel, BITMAPFILEHEADER *bitmapFileHeader){
+  /*==============================================================================
+                        APPLY THE FILTER TO THE IMAGE
+  ================================================================================*/
+  /*==============================
+          VARIABLES NEEDED
+  ================================*/
+  //keep track of the x and y coordinates of the image
+  int x,y,xx,yy;
+  //how many pixels we process
+  int kernelSize;
+  float avgB, avgG, avgR;
 
-              if (x*3 - y*bitmapInfoHeader->biWidth*3 >= 0)
-              {
-                avgB += -1*(bitmapImage[x*3 - y*bitmapInfoHeader->biWidth*3 + 0]);
-                avgG += -1*(bitmapImage[x*3 - y*bitmapInfoHeader->biWidth*3 + 1]);
-                avgR += -1*(bitmapImage[x*3 - y*bitmapInfoHeader->biWidth*3 + 2]);
-              }
-              ile++;
-          }
+  /*===============================*/
+
+  //setting the distance of each pixel from the centre pixel to check from
+  if (kernelW == 3 && kernelH == 3) kernelSize = 1;
+  else if (kernelW == 5 && kernelH == 5) kernelSize = 2;
+  else if (kernelW == 7 && kernelH == 7) kernelSize = 3; //extreme cases
+  else if (kernelW == 9 && kernelH == 9) kernelSize = 4; //extreme cases
+  else{
+    return NULL;
+  }
+
+  //Set the starting pixel to apply the kernel onto
+  int startingPixel = (kernelSize*bitmapInfoHeader->biWidth+kernelSize)*3;
+
+  //Set the ending pixel to apply the kernel onto
+  int endingPixel = ((bitmapInfoHeader->biWidth) * (bitmapInfoHeader->biHeight))*3 - ((kernelSize*(bitmapInfoHeader->biWidth)) + kernelSize)*3;
+
+//traverse through each x-axis in the image
+for (xx = kernelSize; xx<(bitmapInfoHeader->biWidth)-kernelSize; xx++){
+
+  //traverse through each y-axis in the image
+  for (yy=kernelSize; yy<(bitmapInfoHeader->biHeight)-kernelSize; yy++){
+    avgB = avgG = avgR = 0;
+    int column=0;
+
+    /*
+    at current pixel currentP = (xx,yy) of the image
+    get coordinates for currentP's left pixel (according to the kernel size)
+    iterate until we reach currentP's right pixel (according to the kernel size)
+    */
+    for (x=xx - kernelSize; x<bitmapInfoHeader->biWidth && x <= xx+kernelSize; x++){
+
+
+      /*
+      iterate from top left of the kernel window for the current pixel 'currentP'
+      */
+      for (y=yy+kernelSize; y<bitmapInfoHeader->biHeight && y>= yy-kernelSize; y--){
+
+          //NOTE: Need to find a way of changing the  x below to iterate from left to right
+          // of the kernel and not top to bottom
+          //ideas: switch the inner for loops
+          avgB += kernel[column] * colorPlanes->blue[x + y*bitmapInfoHeader->biWidth];
+          avgG += kernel[column] * colorPlanes->green[x + y*bitmapInfoHeader->biWidth];
+          avgR += kernel[column] * colorPlanes->red[x + y*bitmapInfoHeader->biWidth];
+          column++;
       }
 
-      /*for blur*/
-      // avgB = avgB / ile;
-      // avgG = avgG / ile;
-      // avgR = avgR / ile;
+    }
+          //double check the ranges after applying kernel
+          if (avgB < -1.000) avgB = -1.000;
+          else if (avgB > 1.000) avgB = 1.000;
 
-      avgB = avgB + centerB;
-      avgG = avgG + centerG;
-      avgR = avgR + centerR;
+          if (avgG < -1.000) avgG = -1.000;
+          else if (avgG > 1.000) avgG = 1.000;
 
-      if (avgB < 0) avgB = 0;
-      else if (avgB > 255) avgB = 255;
+          if (avgR < -1.0000) avgR = -1.0000;
+          else if (avgR > 1.0000) avgR = 1.0000;
 
-      if (avgG < 0) avgG = 0;
-      else if (avgG > 255) avgG = 255;
-
-      if (avgR < 0) avgR = 0;
-      else if (avgR > 255) avgR = 255;
-
-
-
-      bitmapImage[xx*3 + yy*bitmapInfoHeader->biWidth*3 + 0] = avgB;
-      bitmapImage[xx*3 + yy*bitmapInfoHeader->biWidth*3 + 1] = avgG;
-      bitmapImage[xx*3 + yy*bitmapInfoHeader->biWidth*3 + 2] = avgR;
+    //set the new value, after applying the kernel to the pixel for each colour
+    colorPlanes->blue[xx + yy*bitmapInfoHeader->biWidth] = avgB;
+    colorPlanes->green[xx + yy*bitmapInfoHeader->biWidth] = avgG;
+    colorPlanes->red[xx + yy*bitmapInfoHeader->biWidth] = avgR;
   }
 }
+/*==============================================================================*/
 
-return bitmapImage;
+  return colorPlanes;
 }
-
-unsigned char *applyBlurringFilter(BITMAPINFOHEADER *bitmapInfoHeader, unsigned char *bitmapImage){
-
-  /*Blurring image (getting the average pixel, by surrounding pixels
-    How many surrounding pixels above depends on the blurSize;
-  */
-    int x,xx,y,yy,ile,avgR,avgB,avgG,B,G,R,centerR,centerB,centerG;
-    int blurSize = 10;
-
-    for(xx = 0; xx < bitmapInfoHeader->biWidth; xx++)
-{
-    for(yy = 0; yy < bitmapInfoHeader->biHeight; yy++)
-    {
-        avgB = avgG = avgR = 0;
-        ile = 0;
-
-        for(x = xx; x < bitmapInfoHeader->biWidth && x < xx + blurSize; x++)
-        {
-
-
-            for(y = yy; y < bitmapInfoHeader->biHeight && y < yy + blurSize; y++)
-            {
-                if (x == xx && y == yy){
-                  centerB = (bitmapImage[x*3 + y*bitmapInfoHeader->biWidth*3 + 0]);
-                  centerG = (bitmapImage[x*3 + y*bitmapInfoHeader->biWidth*3 + 1]);
-                  centerR = (bitmapImage[x*3 + y*bitmapInfoHeader->biWidth*3 + 2]);
-                }
-                else{
-                  avgB +=   (bitmapImage[x*3 + y*bitmapInfoHeader->biWidth*3 + 0]);
-                  avgG +=   (bitmapImage[x*3 + y*bitmapInfoHeader->biWidth*3 + 1]);
-                  avgR +=   (bitmapImage[x*3 + y*bitmapInfoHeader->biWidth*3 + 2]);
-                }
-
-                if (x*3 - y*bitmapInfoHeader->biWidth*3 >= 0)
-                {
-                  avgB += (bitmapImage[x*3 - y*bitmapInfoHeader->biWidth*3 + 0]);
-                  avgG += (bitmapImage[x*3 - y*bitmapInfoHeader->biWidth*3 + 1]);
-                  avgR += (bitmapImage[x*3 - y*bitmapInfoHeader->biWidth*3 + 2]);
-                }
-                ile++;
-            }
-        }
-
-        /*for blur*/
-        // avgB = avgB / ile;
-        // avgG = avgG / ile;
-        // avgR = avgR / ile;
-
-        avgB = (avgB + centerB)/ile;
-        avgG = (avgG + centerG)/ile;
-        avgR = (avgR + centerR)/ile;
-
-        bitmapImage[xx*3 + yy*bitmapInfoHeader->biWidth*3 + 0] = avgB;
-        bitmapImage[xx*3 + yy*bitmapInfoHeader->biWidth*3 + 1] = avgG;
-        bitmapImage[xx*3 + yy*bitmapInfoHeader->biWidth*3 + 2] = avgR;
-    }
-}
-
-
-
-  return bitmapImage;
-}
-
-
-
-
-
 
 int main(){
-
   BITMAPFILEHEADER bitmapFileHeader;
   BITMAPINFOHEADER bitmapInfoHeader;
-  unsigned char *bitmapData;
-  bitmapData = LoadBitmapFile("xiahouDun.bmp",&bitmapInfoHeader, &bitmapFileHeader);
-  printf("image file size:\t%d\n", bitmapInfoHeader.biSizeImage);
-  printf("bitmap size: %d\tbitmap type: %c\n", bitmapFileHeader.bfSize, bitmapFileHeader.bfType);
+  PIXELCOLORS *colorPlanes;
+  colorPlanes = readBmp("xiahouDun.bmp",&bitmapInfoHeader,&bitmapFileHeader);
+  if (colorPlanes == NULL) {
+    printf("File not read in correctly\n");
+    exit(-1);
+  }
+  float kernel[9] = {
+                     0.0, -.25, 0.0,
+                     -.25, 2, -.25,
+                     0.0, -.25, 0.0
+                   };
 
-  //Apply sharpening filter
-  // bitmapData = applySharpeningFilter(&bitmapInfoHeader, bitmapData);
+clock_t start = clock(), diff;
+colorPlanes = convolue(colorPlanes,&bitmapInfoHeader,3,3, kernel, &bitmapFileHeader);
+diff = clock() - start;
+if (colorPlanes == NULL){
+  printf("Kernel size is either incorrect or too large\n");
+  exit(-1);
+}
 
-  bitmapData = applySharpeningFilter(&bitmapInfoHeader, bitmapData);
-
-  //Write to image
-  WriteBitmapFile("SharpeningImage.bmp", &bitmapInfoHeader, &bitmapFileHeader, bitmapData);
-
-
-
-
+int msec = diff * 1000 / CLOCKS_PER_SEC;
+printf("Convolution Algorithm Performance: %d seconds %d milliseconds\ns", msec/1000, msec%1000);
+writeBmp(colorPlanes,"sharpeningConvolution2.bmp", &bitmapInfoHeader, &bitmapFileHeader);
   return 0;
 }
